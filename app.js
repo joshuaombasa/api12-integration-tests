@@ -7,7 +7,7 @@ const config = require('./utils/config')
 const middleware = require('./utils/middleware')
 
 const providerRouter = require('./controllers/providers')
-const userRouter = require('./controllers/users')
+
 
 mongoose.connect(config.MONGO_URI)
   .then(() => logger.info('connected to mongodb'))
@@ -22,7 +22,7 @@ app.use(cors())
 
 app.use(middleware.requestLogger)
 
-// app.use('/api/users', userRouter)
+
 app.use('/api/provider', providerRouter)
 
 app.use(middleware.unknownEndpointHandler)
