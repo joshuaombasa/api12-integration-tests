@@ -8,80 +8,103 @@ const api = supertest(app)
 
 beforeEach(async () => {
   await Provider.deleteMany({})
-  for (let provider of helper.providersData) {
-    const providerObject = new Provider(provider)
-    await providerObject.save()
-  }
+
+  // Use Promise.all for parallel insertions — faster and cleaner
+  const providerObjects = helper.providersData.map(p => new Provider(p))
+  await Promise.all(providerObjects.map(p => p.save()))
 })
 
-describe('when there is initially some providers', () => {
-  test('providers are returned as JSON', async () => {
-    await api.get('/api/provider')
-      .send()
-      .expect(200)
-      .expect('Content-Type', /application\/json/)
+describe('Provider API', () => {
+  describe('when there are initially some providers', () => {
+    test('providers are returned as JSON', async () => {
+      await api
+        .get('/api/provider')
+        .expect(200)
+        .expect('Content-Type', /application\/json/)
+    })
+
+    test('all providers are returned', async () => {
+      const response = await api
+        .get('/api/provider')
+        .expect(200)
+        .expect('Content-Type', /application\/json/)
+
+      expect(response.body).toHaveLength(helper.providersData.length)
+    })
+
+    test('a specific provider is among those returned', async () => {
+      const response = await api
+        .get('/api/provider')
+        .expect(200)
+        .expect('Content-Type', /application\/json/)
+
+      const names = response.body.map(p => p.name)
+      expect(names).toContain(helper.providersData[0].name)
+    })
   })
 
-  test('all providers are returned', async () => {
-    const response = await api.get('/api/provider')
-      .send()
-      .expect(200)
-      .expect('Content-Type', /application\/json/)
-    expect(response.body).toHaveLength(helper.providersData.length)
+  describe('adding a new provider', () => {
+    test('succeeds with valid data', async () => {
+      await api
+        .post('/api/provider')
+        .send(helper.validProviderData)
+        .expect(201)
+        .expect('Content-Type', /application\/json/)
+
+      const providersAfter = await helper.providersInDb()
+      expect(providersAfter).toHaveLength(helper.providersData.length + 1)
+
+      const names = providersAfter.map(p => p.name)
+      expect(names).toContain(helper.validProviderData.name)
+    })
+
+    test('fails with status code 400 if data is invalid', async () => {
+      await api
+        .post('/api/provider')
+        .send(helper.inValidProviderData)
+        .expect(400)
+
+      const providersAfter = await helper.providersInDb()
+      expect(providersAfter).toHaveLength(helper.providersData.length)
+    })
   })
 
-  test('a certain provider is among those returned', async () => {
-    const response = await api.get('/api/provider')
-      .send()
-      .expect(200)
-      .expect('Content-Type', /application\/json/)
-    const names = response.body.map(p => p.name)
-    expect(names).toContain(helper.providersData[0].name)
-  })
-})
+  describe('fetching a single provider', () => {
+    test('succeeds with a valid ID', async () => {
+      const providersInDb = await helper.providersInDb()
+      const providerToView = providersInDb[0]
 
-describe('addition of a new provider', () => {
-  test('succeeds when given valid data', async () => {
-    const response = await api.post('/api/provider')
-      .send(helper.validProviderData)
-      .expect(201)
-      .expect('Content-Type', /application\/json/)
-  })
+      const response = await api
+        .get(`/api/provider/${providerToView.id}`)
+        .expect(200)
+        .expect('Content-Type', /application\/json/)
 
-  test('fails with statuscode 400 when given invalid data', async () => {
-    const response = await api.post('/api/provider')
-      .send(helper.inValidProviderData)
-      .expect(400)
-  })
-})
+      expect(response.body.name).toBe(providerToView.name)
+    })
 
-describe('fetching a single provider', () => {
-  test('succeeds when given a valid Id', async () => {
-    const providersInDb = await helper.providersInDb()
-    const response = await api.get(`/api/provider/${providersInDb[0].id}`)
-      .expect(200)
-      .expect('Content-Type', /application\/json/)
+    test('fails with status code 400 for an invalid ID format', async () => {
+      await api.get('/api/provider/invalid-id').expect(400)
+    })
+
+    test('fails with status code 404 for a non-existent ID', async () => {
+      const nonExistentId = await helper.nonExistentId()
+      await api.get(`/api/provider/${nonExistentId}`).expect(404)
+    })
   })
 
-  test('fails with statuscode 400 when given an invalid Id', async () => {
-    const providersInDb = await helper.providersInDb()
-    const response = await api.get(`/api/provider/kqkdj`)
-      .expect(400)
-  })
+  describe('deleting a provider', () => {
+    test('succeeds with a valid ID', async () => {
+      const providersAtStart = await helper.providersInDb()
+      const providerToDelete = providersAtStart[0]
 
-  test('fails with statuscode 404 when given a nonExistent Id', async () => {
-    const nonExistentId = await helper.nonExistentId()
-    const response = await api.get(`/api/provider/${nonExistentId}`)
-      .expect(404)
-  })
-})
+      await api.delete(`/api/provider/${providerToDelete.id}`).expect(204)
 
+      const providersAtEnd = await helper.providersInDb()
+      expect(providersAtEnd).toHaveLength(providersAtStart.length - 1)
 
-describe('deleting a provider', () => {
-  test('succeeds when given a valid id', async() => {
-    const providersInDb = await helper.providersInDb()
-    const response = await api.delete(`/api/provider/${providersInDb[0].id}`)
-      .expect(204)
+      const names = providersAtEnd.map(p => p.name)
+      expect(names).not.toContain(providerToDelete.name)
+    })
   })
 })
 
