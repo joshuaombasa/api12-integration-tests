@@ -3,60 +3,84 @@ const User = require('../models/user')
 
 const userRouter = express.Router()
 
-userRouter.get('/', async (request, response, next) => {
-  const users = await User.find({})
+// Get all users
+userRouter.get('/', async (req, res, next) => {
   try {
-    response.send(users)
+    const users = await User.find({})
+    res.status(200).json(users)
   } catch (error) {
     next(error)
   }
 })
 
-userRouter.get('/:id', async (request, response, next) => {
-  const user = await User.findById(request.params.id)
+// Get single user by ID
+userRouter.get('/:id', async (req, res, next) => {
   try {
-    response.send(user)
+    const user = await User.findById(req.params.id)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+    res.status(200).json(user)
   } catch (error) {
     next(error)
   }
 })
 
-userRouter.post('/:id', async (request, response, next) => {
-  const { email, password } = request.body
-  const userObject = new User({ email, password })
+// Create a new user
+userRouter.post('/', async (req, res, next) => {
   try {
-    const savedUser = await userObject.save()
-    response.status(201).send(savedUser)
+    const { email, password } = req.body
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' })
+    }
+
+    const user = new User({ email, password })
+    const savedUser = await user.save()
+    res.status(201).json(savedUser)
   } catch (error) {
     next(error)
   }
 })
 
-userRouter.put('/:id', async (request, response, next) => {
-  const { email, password } = request.body
-
+// Update user by ID
+userRouter.put('/:id', async (req, res, next) => {
   try {
+    const { email, password } = req.body
+
+    if (!email && !password) {
+      return res.status(400).json({ message: 'At least one field required to update' })
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
-      request.params.id,
+      req.params.id,
       { email, password },
-      { new: true }
+      { new: true, runValidators: true }
     )
-    response.send(updatedUser)
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    res.status(200).json(updatedUser)
   } catch (error) {
     next(error)
   }
 })
 
-userRouter.delete('/:id', async (request, response, next) => {
-
+// Delete user by ID
+userRouter.delete('/:id', async (req, res, next) => {
   try {
-    await User.findByIdAndDelete(request.params.id)
-    response.sendStatus(204)
+    const deletedUser = await User.findByIdAndDelete(req.params.id)
+
+    if (!deletedUser) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    res.sendStatus(204)
   } catch (error) {
     next(error)
   }
 })
 
-
-
-module.exports = { userRouter }
+module.exports = userRouter
