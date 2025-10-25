@@ -1,62 +1,91 @@
-const express = require('express')
-const User = require('../models/user')
+const express = require('express');
+const mongoose = require('mongoose');
+const User = require('../models/user');
 
-const userRouter = express.Router()
+const userRouter = express.Router();
 
-userRouter.get('/', async (request, response, next) => {
-  const users = await User.find({})
+// Get all users
+userRouter.get('/', async (req, res, next) => {
   try {
-    response.send(users)
+    const users = await User.find({});
+    res.status(200).json(users);
   } catch (error) {
-    next(error)
+    next(error);
   }
-})
+});
 
-userRouter.get('/:id', async (request, response, next) => {
-  const user = await User.findById(request.params.id)
+// Get user by ID
+userRouter.get('/:id', async (req, res, next) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: 'Invalid user ID format' });
+  }
+
   try {
-    response.send(user)
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.status(200).json(user);
   } catch (error) {
-    next(error)
+    next(error);
   }
-})
+});
 
-userRouter.post('/:id', async (request, response, next) => {
-  const { email, password } = request.body
-  const userObject = new User({ email, password })
+// Create a new user
+userRouter.post('/', async (req, res, next) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
   try {
-    const savedUser = await userObject.save()
-    response.status(201).send(savedUser)
+    const newUser = new User({ email, password });
+    const savedUser = await newUser.save();
+    res.status(201).json(savedUser);
   } catch (error) {
-    next(error)
+    next(error);
   }
-})
+});
 
-userRouter.put('/:id', async (request, response, next) => {
-  const { email, password } = request.body
+// Update user by ID
+userRouter.put('/:id', async (req, res, next) => {
+  const { id } = req.params;
+  const { email, password } = req.body;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: 'Invalid user ID format' });
+  }
 
   try {
     const updatedUser = await User.findByIdAndUpdate(
-      request.params.id,
+      id,
       { email, password },
-      { new: true }
-    )
-    response.send(updatedUser)
-  } catch (error) {
-    next(error)
-  }
-})
+      { new: true, runValidators: true }
+    );
 
-userRouter.delete('/:id', async (request, response, next) => {
+    if (!updatedUser) return res.status(404).json({ error: 'User not found' });
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete user by ID
+userRouter.delete('/:id', async (req, res, next) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: 'Invalid user ID format' });
+  }
 
   try {
-    await User.findByIdAndDelete(request.params.id)
-    response.sendStatus(204)
+    const deletedUser = await User.findByIdAndDelete(id);
+    if (!deletedUser) return res.status(404).json({ error: 'User not found' });
+    res.sendStatus(204);
   } catch (error) {
-    next(error)
+    next(error);
   }
-})
+});
 
-
-
-module.exports = { userRouter }
+module.exports = { userRouter };
