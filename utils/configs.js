@@ -1,7 +1,17 @@
-require('dotenv').config()
+require('dotenv').config();
 
-const PORT = process.env.PORT
+const { PORT = 3000, NODE_ENV, MONGO_URI, TEST_MONGO_URI } = process.env;
 
-const MONGO_URI = process.env.NODE_ENV === 'test' ? process.env.TEST_MONGO_URI : process.env.MONGO_URI
+const mongoUri =
+  NODE_ENV === 'test'
+    ? TEST_MONGO_URI
+    : MONGO_URI;
 
-module.exports = { PORT, MONGO_URI }
+if (!mongoUri) {
+  throw new Error('MongoDB connection string is missing');
+}
+
+module.exports = {
+  PORT,
+  MONGO_URI: mongoUri,
+};
